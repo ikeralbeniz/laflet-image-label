@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Full Screen Leaflet Map</title>
+    <meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css" />
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+	<link rel="stylesheet" href="popupMod.css" />
+    <style>
+        body {
+            padding: 0;
+            margin: 0;
+        }
+        html, body, #map {
+            height: 100%;
+            width: 100%;
+        }
+		
+		#nextForm {
+		  position: absolute;
+		  top: 20px;
+		  right: 20px;
+		  padding: 10px;
+		  z-index: 400;
+		  visibility: hidden;
+		}
+		
+		#file-input{
+		  position: absolute;
+		  top: 20px;
+		  left: 50px;
+		  padding: 10px;
+		  z-index: 400;
+		}
+
+		#final_form{
+			box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+			visibility: hidden;
+			position: absolute;
+			padding: 20px;
+		  	top: 50px;
+		  	left: 50px;
+			right: 50px;
+			bottom: 50px;
+			background-color: white;
+			z-index: 500;
+		}
+
+    </style>
+</head>
+<body>
+	<div id="final_form">
+		<form>
+			<label>ID Servicio</label><br><br>
+		    <input type="text" class="form_input" id="servicio_id"><br><br>
+			
+			<label>ID Imagen</label><br><br>
+		    <input type="number" class="form_input" id="image_id"><br><br>
+		
+			<label>Sexo</label><br><br>
+			<select class="form_input" id="sexo">
+				<option>Hombre</option>
+				<option>Mujer</option>
+				<option>No Binario</option>
+			</select><br><br>
+			
+			<label>Edad</label><br><br>
+			<input type="number" class="form_input" id="edad"><br><br>
+			
+			<label>Nueva lesion</label><br><br>
+			<select class="form_input" id="nueva_lesion">
+				<option>Si</option>
+				<option>No</option>
+			</select><br><br>
+			
+			<label>Localizacion</label><br><br>
+			<select class="form_input" id="localizacion">
+				<option>Mamas</option>
+				<option>Zona coxígea</option>
+				<option>Cadera</option>
+				<option>Glúteo</option>
+				<option>Cresta ilíaca</option>
+				<option>Trocánter</option>
+				<option>Zona genital- Pubis</option>
+				<option>Cara lateral del metatarso</option>
+				<option>Talón</option>
+				<option>Maleolo interno</option>
+				<option>Maléolo externo</option>
+				<option>Dedos</option>
+			</select><br><br>
+			
+			<label>Nueva lesion</label><br><br>
+			<select class="form_input" id="nueva_lesion">
+				<option>LPP</option>
+				<option>LESCAH</option>
+				<option>Fricción</option>
+				<option>Desgarro</option>
+				<option>Combinada</option>
+			</select><br><br>
+			
+			
+		</form>
+		<button id="saveButton">Exportar Datos</button>
+	</div>
+    <div id="map"></div>
+	<input type="file" id="file-input" />
+	<button id="nextForm">Generar Informe</button>
+
+    <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js">
+    </script>
+	 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>    
+    <script>
+
+        var map = L.map('map', {
+		}).setView([0, 0], 0);
+		
+		const getMeta = (url, cb) => {
+		  const img = new Image();
+		  img.onload = () => cb(null, img);
+		  img.onerror = (err) => cb(err);
+		  img.src = url;
+		};
+
+
+		const labels = {
+			"Areas":[
+				"Perilesion",
+				"Lecho"
+			],
+			"Tejidos": [
+				"Piel Intacta",
+				"Piel cicatrizada",
+				"Dermis-epidermis",
+				"Tejido subcutaneo",
+				"Musculo(fascia)",
+				"Hueso",
+				"Tejidos anejos(tendon, ligamento...)"
+			]
+		}
+
+		function getSelectDom(group, layer){
+
+			var select = document.createElement('select');
+			select.layer = layer;
+			select.layer.label = "";
+
+			select.addEventListener('change', function() {
+				this.layer.label = this.value;
+			});
+
+			labels[group].forEach(element => {
+				var option = document.createElement('option');
+				option.value = element;
+				option.innerHTML = element;
+				select.appendChild(option);
+			});
+			layer.bindPopup(select);
+		}
+		
+		
+		function getParatemetr(form, id){
+			console.log(form);
+			for (var i = 0; i < form.length; i++) {
+			    if(form[i].id == id){
+				 return form[i].value;
+				}
+			}
+			return "-"
+		}
+
+		
+		document.getElementById('file-input').addEventListener('change', readSingleFile, false);
+   
+		
+		function readSingleFile(e) {
+			  var file = e.target.files[0];
+			  if (!file) {
+				return;
+			  }
+			  
+			  document.getElementById('file-input').style.visibility = "hidden";
+			  document.getElementById('nextForm').style.visibility = "visible";
+
+				getMeta(URL.createObjectURL(file), (err, img) => {
+				
+					var imageUrl = img.src;
+					var outside_bounds = true;
+					
+					var scale = 100;
+					var bound_w = img.naturalWidth/scale;
+					var bound_h = img.naturalHeight/scale;
+					
+					while (outside_bounds){
+						if(bound_w < 360 && bound_h < 170){
+							outside_bounds = false;
+						}else{
+							bound_w = bound_w / 2;
+							bound_h = bound_h / 2;
+							scale = scale * 2;
+						}
+					}
+					imageBounds = [[-1*bound_h/2, -1*bound_w/2], [bound_h/2, bound_w/2]];
+
+					console.log(imageUrl, imageBounds);
+
+					L.imageOverlay(imageUrl, imageBounds).addTo(map);
+					map.setMaxBounds(imageBounds);
+					map.fitBounds(imageBounds);
+					
+					//L.control.layers({}, { 'drawlayer': drawnItems }, { position: 'topleft', collapsed: false }).addTo(map);
+
+					const areas = L.featureGroup();
+					const tejidos = L.featureGroup();
+					
+					
+					var overlayMaps = {
+						"Areas": areas,
+						"Tejidos": tejidos
+					};
+
+
+					
+					var layerControl = L.control.layers(overlayMaps,{}, { position: 'bottomright', collapsed: false }).addTo(map);
+					areas.addTo(map);
+					
+					map.addControl(new L.Control.Draw({
+						edit: {
+							featureGroup: areas,
+							poly: {
+								allowIntersection: false
+							}
+						},
+						draw: {
+							polygon: {
+								allowIntersection: false,
+								showArea: true
+							}
+						}
+					}));
+
+					var currentFeatureGroup = areas;
+					var currentFeatureGroupName = "Areas";
+
+					map.on('baselayerchange', function (e) {
+					  currentFeatureGroup = e.layer;
+					  currentFeatureGroupName = e.name;
+					  
+					});
+
+					function getCurrentFeatureGroup () {
+					  return currentFeatureGroup;
+					}
+
+					function getCurrentFeatureGroupName () {
+					  return currentFeatureGroupName;
+					}
+
+
+					map.on(L.Draw.Event.CREATED, function (event) {
+						var layer = event.layer;
+						
+						//layer.bindPopup("Please add description", {editable: true} );
+						var featureGroup = getCurrentFeatureGroup();
+						var featureGroupName = getCurrentFeatureGroupName();
+
+						console.log(featureGroupName);
+						getSelectDom(featureGroupName,layer);
+						if (featureGroup instanceof L.FeatureGroup) {
+							featureGroup.addLayer(layer);
+						} else {
+							alert('Please select a featuregroup');
+						}
+					});
+
+					
+					document.getElementById('nextForm').onclick = function(e) {
+						document.getElementById('final_form').style.visibility = "visible";
+					}
+					
+					
+					document.getElementById('saveButton').onclick = function(e) {
+						// Extract GeoJson from featureGroup
+						var layers_data = {
+							"meta": {
+								"bounds": imageBounds,
+								"scale": scale
+							}
+						};
+						
+					
+						
+						for (let k in overlayMaps) {
+						    var data = []
+							overlayMaps[k].eachLayer(function (layeritem) {
+								 data.push({
+									label: layeritem.getPopup()._content.value,
+									shape : layeritem.toGeoJSON()
+									})
+								console.log(layeritem.getPopup()._content.value);
+								console.log(layeritem.toGeoJSON());
+							});
+							layers_data[k.toLowerCase()] = data;
+						}
+						
+
+
+						var form = []
+						
+
+						var form_inputs = document.getElementsByClassName('form_input');
+						for (var i = 0; i < form_inputs.length; i++) {
+							form.push({
+								id: form_inputs[i].id,
+								value: form_inputs[i].value
+							})
+						}
+						
+						const reader = new FileReader();
+						reader.readAsDataURL(file);
+						
+						console.log(getParatemetr(form, 'servicio_id'));
+						console.log(getParatemetr(form, 'image_id'));
+						reader.onload = function(readerEvt) {
+							var outcome = {
+								"labels": layers_data,
+								"form": form,
+								"file": readerEvt.target.result
+							}
+							var fileContent = JSON.stringify(outcome);
+							var bb = new Blob([fileContent ], { type: 'text/json' });
+							var a = document.createElement('a');
+							a.download = getParatemetr(form, 'servicio_id')+'_'+getParatemetr(form, 'image_id')+'_'+Date.now()+'_'+getParatemetr(form, 'localizacion')+'.json';
+							a.href = window.URL.createObjectURL(bb);
+							a.click();
+						};
+
+						
+						//location.reload();
+
+					}
+				});
+
+		  }
+		       
+    </script>
+</body>
+</html>
