@@ -1,347 +1,981 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Full Screen Leaflet Map</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-    <style>
-        body {
-            padding: 0;
-            margin: 0;
-        }
-        html, body, #map {
-            height: 100%;
-            width: 100%;
-        }
-		
-		#nextForm {
-		  position: absolute;
-		  top: 20px;
-		  right: 20px;
-		  padding: 10px;
-		  z-index: 400;
-		  visibility: hidden;
-		}
-		
-		#file-input{
-		  position: absolute;
-		  top: 20px;
-		  left: 50px;
-		  padding: 10px;
-		  z-index: 400;
-		}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DermaLabel — Etiquetado de Lesiones Cutáneas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #161922;
+      --surface2: #1e2330;
+      --border: #2a3045;
+      --accent: #00d4aa;
+      --accent2: #ff6b6b;
+      --accent3: #ffd166;
+      --text: #e8eaf0;
+      --text-muted: #7a8099;
+      --radius: 8px;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
 
-		#final_form{
-			box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-			visibility: hidden;
-			position: absolute;
-			padding: 20px;
-		  	top: 50px;
-		  	left: 50px;
-			right: 50px;
-			bottom: 50px;
-			background-color: white;
-			z-index: 500;
-		}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    </style>
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 600;
+    }
+    #header h1 {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+    #header h1 span { color: var(--text-muted); font-weight: 400; }
+
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
+    .badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .badge.active { border-color: var(--accent); color: var(--accent); }
+
+    /* ── MAIN LAYOUT ── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 500;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-section h3 {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .field { margin-bottom: 12px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .field input, .field select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 10px;
+      border-radius: var(--radius);
+      font-family: var(--sans);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+    }
+    .field select option { background: var(--surface2); }
+
+    /* Radio group */
+    .radio-group { display: flex; gap: 6px; }
+    .radio-group label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .radio-group input { display: none; }
+    .radio-group input:checked + span {
+      color: var(--accent);
+    }
+    .radio-group label:has(input:checked) {
+      border-color: var(--accent);
+      background: rgba(0,212,170,0.08);
+      color: var(--accent);
+    }
+
+    /* Layer selector */
+    .layer-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      transition: all 0.15s;
+      font-family: var(--sans);
+    }
+    .layer-btn:last-child { margin-bottom: 0; }
+    .layer-btn .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .layer-btn.active {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(0,212,170,0.06);
+    }
+    .layer-btn .count {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 10px;
+      background: var(--surface2);
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    /* Annotation list */
+    #annotation-list { list-style: none; }
+    #annotation-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    #annotation-list li:hover { background: var(--surface2); }
+    #annotation-list li .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    #annotation-list li .del {
+      margin-left: auto;
+      opacity: 0;
+      color: var(--accent2);
+      font-size: 14px;
+      line-height: 1;
+    }
+    #annotation-list li:hover .del { opacity: 1; }
+    .empty-state {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 16px 0;
+      opacity: 0.6;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0d0f14;
+      width: 100%;
+      justify-content: center;
+    }
+    .btn-primary:hover { background: #00f0c0; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .btn-outline:hover { border-color: var(--text-muted); color: var(--text); }
+    .btn-danger {
+      background: transparent;
+      border: 1px solid var(--accent2);
+      color: var(--accent2);
+      width: 100%;
+      justify-content: center;
+      margin-top: 8px;
+    }
+    .btn-danger:hover { background: rgba(255,107,107,0.1); }
+
+    /* ── MAP AREA ── */
+    #map-container {
+      flex: 1;
+      position: relative;
+      background: #080a0e;
+    }
+
+    #map { width: 100%; height: 100%; }
+
+    /* Drop zone */
+    #drop-zone {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 1000;
+      background: var(--bg);
+    }
+    #drop-zone.hidden { display: none; }
+
+    .drop-icon {
+      width: 80px; height: 80px;
+      border: 2px dashed var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    #drop-zone.drag-over .drop-icon {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0,212,170,0.06);
+    }
+    .drop-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .drop-sub { font-size: 13px; color: var(--text-muted); }
+    .drop-btn {
+      padding: 10px 24px;
+      background: var(--accent);
+      color: #0d0f14;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .drop-btn:hover { background: #00f0c0; }
+
+    #file-input { display: none; }
+
+    /* Map info bar */
+    #map-info {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13,15,20,0.85);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      z-index: 500;
+      backdrop-filter: blur(8px);
+      display: none;
+    }
+
+    /* Leaflet overrides */
+    .leaflet-container { background: #080a0e; }
+    .leaflet-control-zoom a {
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+      color: var(--text) !important;
+    }
+    .leaflet-control-zoom a:hover { background: var(--surface2) !important; }
+    .leaflet-draw-toolbar a {
+      background-color: var(--surface) !important;
+      border-bottom-color: var(--border) !important;
+    }
+    .leaflet-draw-toolbar a:hover { background-color: var(--surface2) !important; }
+    .leaflet-bar { border: 1px solid var(--border) !important; box-shadow: none !important; }
+
+    /* Popup */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface) !important;
+      border: 1px solid var(--border) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+      border-radius: 10px !important;
+      color: var(--text) !important;
+    }
+    .leaflet-popup-tip { background: var(--surface) !important; }
+    .leaflet-popup-close-button { color: var(--text-muted) !important; }
+
+    .popup-inner { min-width: 220px; }
+    .popup-inner h4 {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .popup-inner select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: var(--sans);
+      outline: none;
+      margin-bottom: 6px;
+    }
+    .popup-inner select:focus { border-color: var(--accent); }
+    .popup-save {
+      width: 100%;
+      padding: 7px;
+      background: var(--accent);
+      color: #0d0f14;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: var(--sans);
+      margin-top: 4px;
+    }
+    .popup-save:hover { background: #00f0c0; }
+
+    /* Export overlay */
+    #export-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 900;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    #export-overlay.show { display: flex; }
+
+    #export-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 480px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .panel-header button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .panel-body { padding: 24px; }
+    .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .panel-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+
+    .summary-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    .summary-box h4 {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-row span:last-child { color: var(--text); font-weight: 500; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
 </head>
 <body>
-	<div id="final_form">
-		<form>
-			<label>ID Servicio</label><br><br>
-		    <input type="text" class="form_input" id="servicio_id"><br><br>
-			
-			<label>ID Imagen</label><br><br>
-		    <input type="number" class="form_input" id="image_id"><br><br>
-		
-			<label>Sexo</label><br><br>
-			<select class="form_input" id="sexo">
-				<option>Hombre</option>
-				<option>Mujer</option>
-				<option>No Binario</option>
-			</select><br><br>
-			
-			<label>Edad</label><br><br>
-			<input type="number" class="form_input" id="edad"><br><br>
-			
-			<label>Nueva lesion</label><br><br>
-			<select class="form_input" id="nueva_lesion">
-				<option>Si</option>
-				<option>No</option>
-			</select><br><br>
-			
-			<label>Localizacion</label><br><br>
-			<select class="form_input" id="localizacion">
-				<option>Mamas</option>
-				<option>Zona coxígea</option>
-				<option>Cadera</option>
-				<option>Glúteo</option>
-				<option>Cresta ilíaca</option>
-				<option>Trocánter</option>
-				<option>Zona genital- Pubis</option>
-				<option>Cara lateral del metatarso</option>
-				<option>Talón</option>
-				<option>Maleolo interno</option>
-				<option>Maléolo externo</option>
-				<option>Dedos</option>
-			</select><br><br>
-			
-			<label>Nueva lesion</label><br><br>
-			<select class="form_input" id="nueva_lesion">
-				<option>LPP</option>
-				<option>LESCAH</option>
-				<option>Fricción</option>
-				<option>Desgarro</option>
-				<option>Combinada</option>
-			</select><br><br>
-			
-			
-		</form>
-		<button id="saveButton">Exportar Datos</button>
-	</div>
+
+<!-- HEADER -->
+<div id="header">
+  <h1>Derma<span>Label</span> <span style="color:var(--border)">|</span> <span>Etiquetado de Lesiones Cutáneas</span></h1>
+  <div class="header-actions">
+    <span class="badge" id="annotation-count-badge">0 anotaciones</span>
+    <button class="btn btn-outline" id="btn-export" style="display:none" onclick="openExport()">
+      ↗ Exportar
+    </button>
+    <button class="btn btn-outline" id="btn-new" style="display:none" onclick="resetAll()">
+      ＋ Nueva imagen
+    </button>
+  </div>
+</div>
+
+<div id="main">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+
+    <!-- Layer selector -->
+    <div class="sidebar-section">
+      <h3>Capa activa</h3>
+      <button class="layer-btn active" id="layer-btn-areas" onclick="setLayer('areas')">
+        <div class="dot" style="background:#00d4aa"></div>
+        Áreas de la lesión
+        <span class="count" id="count-areas">0</span>
+      </button>
+      <button class="layer-btn" id="layer-btn-tejidos" onclick="setLayer('tejidos')">
+        <div class="dot" style="background:#ffd166"></div>
+        Tejidos
+        <span class="count" id="count-tejidos">0</span>
+      </button>
+      <button class="layer-btn" id="layer-btn-bordes" onclick="setLayer('bordes')">
+        <div class="dot" style="background:#ff6b6b"></div>
+        Bordes y contornos
+        <span class="count" id="count-bordes">0</span>
+      </button>
+    </div>
+
+    <!-- Annotation list -->
+    <div class="sidebar-section" style="flex:1">
+      <h3>Anotaciones <span id="total-count">(0)</span></h3>
+      <ul id="annotation-list">
+        <li><span class="empty-state">Sin anotaciones aún.<br>Dibuja sobre la imagen.</span></li>
+      </ul>
+    </div>
+
+    <!-- Actions -->
+    <div class="sidebar-section">
+      <button class="btn btn-primary" id="btn-export2" style="display:none" onclick="openExport()">↗ Exportar datos</button>
+      <div id="tip" style="font-size:12px; color:var(--text-muted); line-height:1.5">
+        💡 Carga una imagen para comenzar a etiquetar.<br><br>
+        Usa las herramientas de dibujo en el mapa para marcar áreas.
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div id="map-container">
+    <div id="drop-zone">
+      <div class="drop-icon">🩺</div>
+      <div class="drop-title">Carga una imagen de lesión</div>
+      <div class="drop-sub">Arrastra aquí o selecciona un archivo</div>
+      <button class="drop-btn" onclick="document.getElementById('file-input').click()">Seleccionar imagen</button>
+      <div class="drop-sub" style="font-size:11px">JPG, PNG, WEBP</div>
+    </div>
     <div id="map"></div>
-	<input type="file" id="file-input" />
-	<button id="nextForm">Generar Informe</button>
+    <div id="map-info">Scroll para zoom · Click+arrastrar para mover</div>
+    <input type="file" id="file-input" accept="image/*">
+  </div>
+</div>
 
-    <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js">
-    </script>
-	 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>    
-    <script>
+<!-- EXPORT PANEL -->
+<div id="export-overlay">
+  <div id="export-panel">
+    <div class="panel-header">
+      <h2>📋 Exportar datos</h2>
+      <button onclick="closeExport()">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="summary-box" id="summary-box"></div>
+      <div class="panel-grid">
+        <div class="field">
+          <label>ID Servicio</label>
+          <input type="text" id="f-servicio" placeholder="SRV-001">
+        </div>
+        <div class="field">
+          <label>ID Imagen</label>
+          <input type="text" id="f-imagen" placeholder="IMG-001">
+        </div>
+        <div class="field">
+          <label>Sexo</label>
+          <select id="f-sexo">
+            <option>Hombre</option>
+            <option>Mujer</option>
+            <option>No binario</option>
+            <option>Prefiero no indicar</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Edad</label>
+          <input type="number" id="f-edad" placeholder="65" min="0" max="120">
+        </div>
+        <div class="field">
+          <label>Localización anatómica</label>
+          <select id="f-localizacion">
+            <option>Mamas</option>
+            <option>Zona coxígea</option>
+            <option>Cadera</option>
+            <option>Glúteo</option>
+            <option>Cresta ilíaca</option>
+            <option>Trocánter</option>
+            <option>Zona genital - Pubis</option>
+            <option>Cara lateral del metatarso</option>
+            <option>Talón</option>
+            <option>Maléolo interno</option>
+            <option>Maléolo externo</option>
+            <option>Dedos</option>
+            <option>Sacro</option>
+            <option>Espalda</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tipo de lesión</label>
+          <select id="f-tipo">
+            <option>LPP (Lesión por presión)</option>
+            <option>LESCAH</option>
+            <option>Fricción</option>
+            <option>Desgarro</option>
+            <option>Combinada</option>
+            <option>Úlcera venosa</option>
+            <option>Úlcera arterial</option>
+            <option>Pie diabético</option>
+            <option>Quemadura</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Categoría / Grado</label>
+          <select id="f-categoria">
+            <option>Categoría I</option>
+            <option>Categoría II</option>
+            <option>Categoría III</option>
+            <option>Categoría IV</option>
+            <option>No clasificable</option>
+            <option>Sospecha lesión tejido profundo</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>¿Lesión nueva?</label>
+          <select id="f-nueva">
+            <option>Sí</option>
+            <option>No</option>
+            <option>Desconocido</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label>Observaciones</label>
+        <input type="text" id="f-obs" placeholder="Notas adicionales...">
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button class="btn btn-primary" onclick="exportData()" style="flex:1">⬇ Descargar JSON</button>
+      <button class="btn btn-outline" onclick="closeExport()">Cancelar</button>
+    </div>
+  </div>
+</div>
 
-        var map = L.map('map', {
-		}).setView([0, 0], 0);
-		
-		const getMeta = (url, cb) => {
-		  const img = new Image();
-		  img.onload = () => cb(null, img);
-		  img.onerror = (err) => cb(err);
-		  img.src = url;
-		};
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+const LAYERS_CONFIG = {
+  areas: {
+    name: 'Áreas',
+    color: '#00d4aa',
+    fillColor: '#00d4aa',
+    fillOpacity: 0.18,
+    labels: ['Perilesión','Lecho de la herida','Tejido de granulación','Tejido necrótico','Esfacelo','Exudado','Zona macerada','Zona eritematosa']
+  },
+  tejidos: {
+    name: 'Tejidos',
+    color: '#ffd166',
+    fillColor: '#ffd166',
+    fillOpacity: 0.18,
+    labels: ['Piel intacta','Piel cicatrizada','Dermis / Epidermis','Tejido subcutáneo','Músculo (fascia)','Hueso expuesto','Tendón / Ligamento','Cartílago']
+  },
+  bordes: {
+    name: 'Bordes',
+    color: '#ff6b6b',
+    fillColor: '#ff6b6b',
+    fillOpacity: 0.18,
+    labels: ['Borde definido','Borde irregular','Borde socavado','Borde evertido','Borde eritematoso','Borde macerado']
+  }
+};
 
-		const labels = {
-			"Areas":[
-				"Perilesion",
-				"Lecho"
-			],
-			"Tejidos": [
-				"Piel Intacta",
-				"Piel cicatrizada",
-				"Dermis-epidermis",
-				"Tejido subcutaneo",
-				"Musculo(fascia)",
-				"Hueso",
-				"Tejidos anejos(tendon, ligamento...)"
-			]
-		}
+// ── STATE ────────────────────────────────────────────────
+let map, currentFile, currentLayerKey = 'areas';
+let featureGroups = {};
+let annotations = []; // {id, layerKey, label, leafletLayer}
+let annotationCounter = 0;
+let drawControl;
 
-		function getSelectDom(group, layer){
+// ── MAP INIT ─────────────────────────────────────────────
+map = L.map('map', { zoomControl: true, attributionControl: false }).setView([0,0], 1);
 
-			var select = document.createElement('select');
-			select.layer = layer;
-			select.layer.label = "";
+// ── FILE LOADING ─────────────────────────────────────────
+const fileInput = document.getElementById('file-input');
+const dropZone  = document.getElementById('drop-zone');
 
-			select.addEventListener('change', function() {
-				this.layer.label = this.value;
-			});
+fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
 
-			labels[group].forEach(element => {
-				var option = document.createElement('option');
-				option.value = element;
-				option.innerHTML = element;
-				select.appendChild(option);
-			});
-			layer.bindPopup(select);
-		}
-		
-		
-		function getParatemetr(form, id){
-			console.log(form);
-			for (var i = 0; i < form.length; i++) {
-			    if(form[i].id == id){
-				 return form[i].value;
-				}
-			}
-			return "-"
-		}
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadFile(file);
+});
 
-		
-		document.getElementById('file-input').addEventListener('change', readSingleFile, false);
-   
-		
-		function readSingleFile(e) {
-			  var file = e.target.files[0];
-			  if (!file) {
-				return;
-			  }
-			  
-			  document.getElementById('file-input').style.visibility = "hidden";
-			  document.getElementById('nextForm').style.visibility = "visible";
+function loadFile(file) {
+  if (!file) return;
+  currentFile = file;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => initMap(url, img);
+  img.src = url;
+}
 
-				getMeta(URL.createObjectURL(file), (err, img) => {
-				
-					var imageUrl = img.src;
-					var outside_bounds = true;
-					
-					var scale = 100;
-					var bound_w = img.naturalWidth/scale;
-					var bound_h = img.naturalHeight/scale;
-					
-					while (outside_bounds){
-						if(bound_w < 360 && bound_h < 170){
-							outside_bounds = false;
-						}else{
-							bound_w = bound_w / 2;
-							bound_h = bound_h / 2;
-							scale = scale * 2;
-						}
-					}
-					imageBounds = [[-1*bound_h/2, -1*bound_w/2], [bound_h/2, bound_w/2]];
+function initMap(url, img) {
+  dropZone.classList.add('hidden');
+  document.getElementById('map-info').style.display = 'block';
+  document.getElementById('btn-export').style.display = '';
+  document.getElementById('btn-new').style.display = '';
+  document.getElementById('btn-export2').style.display = '';
+  document.getElementById('tip').style.display = 'none';
 
-					console.log(imageUrl, imageBounds);
+  // Calculate bounds
+  let w = img.naturalWidth, h = img.naturalHeight;
+  const scale = Math.max(w / 800, h / 600, 1);
+  w /= scale; h /= scale;
+  const bounds = [[-h/2, -w/2], [h/2, w/2]];
 
-					L.imageOverlay(imageUrl, imageBounds).addTo(map);
-					map.setMaxBounds(imageBounds);
-					map.fitBounds(imageBounds);
-					
-					//L.control.layers({}, { 'drawlayer': drawnItems }, { position: 'topleft', collapsed: false }).addTo(map);
+  L.imageOverlay(url, bounds, { opacity: 1 }).addTo(map);
+  map.setMaxBounds(bounds);
+  map.fitBounds(bounds, { padding: [20,20] });
 
-					const areas = L.featureGroup();
-					const tejidos = L.featureGroup();
-					
-					
-					var overlayMaps = {
-						"Areas": areas,
-						"Tejidos": tejidos
-					};
+  // Feature groups
+  Object.keys(LAYERS_CONFIG).forEach(key => {
+    featureGroups[key] = L.featureGroup().addTo(map);
+  });
 
+  // Draw control
+  drawControl = new L.Control.Draw({
+    position: 'topleft',
+    edit: { featureGroup: featureGroups[currentLayerKey] },
+    draw: {
+      polygon: {
+        allowIntersection: false,
+        showArea: true,
+        shapeOptions: { color: LAYERS_CONFIG[currentLayerKey].color, fillColor: LAYERS_CONFIG[currentLayerKey].fillColor, fillOpacity: 0.18, weight: 2 }
+      },
+      rectangle: {
+        shapeOptions: { color: LAYERS_CONFIG[currentLayerKey].color, fillColor: LAYERS_CONFIG[currentLayerKey].fillColor, fillOpacity: 0.18, weight: 2 }
+      },
+      circle: {
+        shapeOptions: { color: LAYERS_CONFIG[currentLayerKey].color, fillColor: LAYERS_CONFIG[currentLayerKey].fillColor, fillOpacity: 0.18, weight: 2 }
+      },
+      polyline: false, marker: false, circlemarker: false
+    }
+  });
+  map.addControl(drawControl);
 
-					
-					var layerControl = L.control.layers(overlayMaps,{}, { position: 'bottomright', collapsed: false }).addTo(map);
-					areas.addTo(map);
-					
-					map.addControl(new L.Control.Draw({
-						edit: {
-							featureGroup: areas,
-							poly: {
-								allowIntersection: false
-							}
-						},
-						draw: {
-							polygon: {
-								allowIntersection: false,
-								showArea: true
-							}
-						}
-					}));
+  // Draw event
+  map.on(L.Draw.Event.CREATED, function(e) {
+    const layer = e.layer;
+    const cfg = LAYERS_CONFIG[currentLayerKey];
+    layer.setStyle && layer.setStyle({ color: cfg.color, fillColor: cfg.fillColor, fillOpacity: cfg.fillOpacity, weight: 2 });
 
-					var currentFeatureGroup = areas;
-					var currentFeatureGroupName = "Areas";
+    const id = ++annotationCounter;
+    const ann = { id, layerKey: currentLayerKey, label: cfg.labels[0], leafletLayer: layer };
+    annotations.push(ann);
+    featureGroups[currentLayerKey].addLayer(layer);
 
-					map.on('baselayerchange', function (e) {
-					  currentFeatureGroup = e.layer;
-					  currentFeatureGroupName = e.name;
-					  
-					});
+    // Popup
+    showPopup(layer, ann, cfg);
+    updateUI();
+  });
 
-					function getCurrentFeatureGroup () {
-					  return currentFeatureGroup;
-					}
+  // Delete event
+  map.on(L.Draw.Event.DELETED, function(e) {
+    e.layers.eachLayer(l => {
+      annotations = annotations.filter(a => a.leafletLayer !== l);
+    });
+    updateUI();
+  });
 
-					function getCurrentFeatureGroupName () {
-					  return currentFeatureGroupName;
-					}
+  setLayer('areas');
+}
 
+function showPopup(layer, ann, cfg) {
+  const div = document.createElement('div');
+  div.className = 'popup-inner';
 
-					map.on(L.Draw.Event.CREATED, function (event) {
-						var layer = event.layer;
-						
-						//layer.bindPopup("Please add description", {editable: true} );
-						var featureGroup = getCurrentFeatureGroup();
-						var featureGroupName = getCurrentFeatureGroupName();
+  const title = document.createElement('h4');
+  title.textContent = cfg.name + ' — Etiqueta';
+  div.appendChild(title);
 
-						console.log(featureGroupName);
-						getSelectDom(featureGroupName,layer);
-						if (featureGroup instanceof L.FeatureGroup) {
-							featureGroup.addLayer(layer);
-						} else {
-							alert('Please select a featuregroup');
-						}
-					});
+  const sel = document.createElement('select');
+  cfg.labels.forEach(lbl => {
+    const o = document.createElement('option');
+    o.value = lbl; o.textContent = lbl;
+    if (lbl === ann.label) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.onchange = () => { ann.label = sel.value; updateUI(); };
+  div.appendChild(sel);
 
-					
-					document.getElementById('nextForm').onclick = function(e) {
-						document.getElementById('final_form').style.visibility = "visible";
-					}
-					
-					
-					document.getElementById('saveButton').onclick = function(e) {
-						// Extract GeoJson from featureGroup
-						var layers_data = {
-							"meta": {
-								"bounds": imageBounds,
-								"scale": scale
-							}
-						};
-						
-					
-						
-						for (let k in overlayMaps) {
-						    var data = []
-							overlayMaps[k].eachLayer(function (layeritem) {
-								 data.push({
-									label: layeritem.getPopup()._content.value,
-									shape : layeritem.toGeoJSON()
-									})
-								console.log(layeritem.getPopup()._content.value);
-								console.log(layeritem.toGeoJSON());
-							});
-							layers_data[k.toLowerCase()] = data;
-						}
-						
+  const btn = document.createElement('button');
+  btn.className = 'popup-save';
+  btn.textContent = '✓ Confirmar';
+  btn.onclick = () => { ann.label = sel.value; map.closePopup(); updateUI(); };
+  div.appendChild(btn);
 
+  layer.bindPopup(div, { maxWidth: 260 }).openPopup();
+}
 
-						var form = []
-						
+// ── LAYER SWITCHING ───────────────────────────────────────
+function setLayer(key) {
+  currentLayerKey = key;
+  Object.keys(LAYERS_CONFIG).forEach(k => {
+    document.getElementById('layer-btn-' + k).classList.toggle('active', k === key);
+  });
+  // Update drawControl
+  if (drawControl) {
+    map.removeControl(drawControl);
+    const cfg = LAYERS_CONFIG[key];
+    drawControl = new L.Control.Draw({
+      position: 'topleft',
+      edit: { featureGroup: featureGroups[key] },
+      draw: {
+        polygon: {
+          allowIntersection: false, showArea: true,
+          shapeOptions: { color: cfg.color, fillColor: cfg.fillColor, fillOpacity: 0.18, weight: 2 }
+        },
+        rectangle: {
+          shapeOptions: { color: cfg.color, fillColor: cfg.fillColor, fillOpacity: 0.18, weight: 2 }
+        },
+        circle: {
+          shapeOptions: { color: cfg.color, fillColor: cfg.fillColor, fillOpacity: 0.18, weight: 2 }
+        },
+        polyline: false, marker: false, circlemarker: false
+      }
+    });
+    map.addControl(drawControl);
+  }
+}
 
-						var form_inputs = document.getElementsByClassName('form_input');
-						for (var i = 0; i < form_inputs.length; i++) {
-							form.push({
-								id: form_inputs[i].id,
-								value: form_inputs[i].value
-							})
-						}
-						
-						const reader = new FileReader();
-						reader.readAsDataURL(file);
-						
-						console.log(getParatemetr(form, 'servicio_id'));
-						console.log(getParatemetr(form, 'image_id'));
-						reader.onload = function(readerEvt) {
-							var outcome = {
-								"labels": layers_data,
-								"form": form,
-								"file": readerEvt.target.result
-							}
-							var fileContent = JSON.stringify(outcome);
-							var bb = new Blob([fileContent ], { type: 'text/json' });
-							var a = document.createElement('a');
-							a.download = getParatemetr(form, 'servicio_id')+'_'+getParatemetr(form, 'image_id')+'_'+Date.now()+'_'+getParatemetr(form, 'localizacion')+'.json';
-							a.href = window.URL.createObjectURL(bb);
-							a.click();
-						};
+// ── UPDATE UI ─────────────────────────────────────────────
+function updateUI() {
+  // Layer counts
+  Object.keys(LAYERS_CONFIG).forEach(key => {
+    const n = annotations.filter(a => a.layerKey === key).length;
+    document.getElementById('count-' + key).textContent = n;
+  });
 
-						
-						location.reload();
+  const total = annotations.length;
+  document.getElementById('total-count').textContent = '(' + total + ')';
+  document.getElementById('annotation-count-badge').textContent = total + ' anotación' + (total === 1 ? '' : 'es');
 
-					}
-				});
+  // Annotation list
+  const ul = document.getElementById('annotation-list');
+  ul.innerHTML = '';
+  if (annotations.length === 0) {
+    ul.innerHTML = '<li><span class="empty-state">Sin anotaciones aún.<br>Dibuja sobre la imagen.</span></li>';
+    return;
+  }
+  annotations.forEach(ann => {
+    const cfg = LAYERS_CONFIG[ann.layerKey];
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div class="dot" style="background:${cfg.color}"></div>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ann.label}</span>
+      <span style="font-size:10px;opacity:0.5;font-family:var(--mono)">#${ann.id}</span>
+      <span class="del" onclick="deleteAnnotation(${ann.id})" title="Eliminar">✕</span>
+    `;
+    li.onclick = (e) => {
+      if (e.target.classList.contains('del')) return;
+      try { ann.leafletLayer.openPopup && ann.leafletLayer.openPopup(); } catch(err){}
+    };
+    ul.appendChild(li);
+  });
+}
 
-		  }
-		       
-    </script>
+function deleteAnnotation(id) {
+  const ann = annotations.find(a => a.id === id);
+  if (!ann) return;
+  featureGroups[ann.layerKey].removeLayer(ann.leafletLayer);
+  annotations = annotations.filter(a => a.id !== id);
+  updateUI();
+}
+
+// ── EXPORT ────────────────────────────────────────────────
+function openExport() {
+  // Summary
+  const total = annotations.length;
+  const byLayer = {};
+  Object.keys(LAYERS_CONFIG).forEach(k => { byLayer[k] = annotations.filter(a => a.layerKey === k).length; });
+
+  document.getElementById('summary-box').innerHTML = `
+    <h4>Resumen</h4>
+    <div class="summary-row"><span>Total anotaciones</span><span>${total}</span></div>
+    ${Object.entries(byLayer).map(([k,n]) => `
+      <div class="summary-row"><span>${LAYERS_CONFIG[k].name}</span><span>${n}</span></div>
+    `).join('')}
+    <div class="summary-row"><span>Archivo</span><span>${currentFile ? currentFile.name : '—'}</span></div>
+  `;
+  document.getElementById('export-overlay').classList.add('show');
+}
+function closeExport() {
+  document.getElementById('export-overlay').classList.remove('show');
+}
+
+function exportData() {
+  const formData = {
+    servicio_id: document.getElementById('f-servicio').value,
+    imagen_id:   document.getElementById('f-imagen').value,
+    sexo:        document.getElementById('f-sexo').value,
+    edad:        document.getElementById('f-edad').value,
+    localizacion: document.getElementById('f-localizacion').value,
+    tipo_lesion: document.getElementById('f-tipo').value,
+    categoria:   document.getElementById('f-categoria').value,
+    nueva_lesion: document.getElementById('f-nueva').value,
+    observaciones: document.getElementById('f-obs').value,
+  };
+
+  const layersData = {};
+  Object.keys(LAYERS_CONFIG).forEach(key => {
+    layersData[key] = annotations
+      .filter(a => a.layerKey === key)
+      .map(a => ({
+        id: a.id,
+        label: a.label,
+        geometry: a.leafletLayer.toGeoJSON ? a.leafletLayer.toGeoJSON() : null
+      }));
+  });
+
+  const payload = {
+    version: '2.0',
+    timestamp: new Date().toISOString(),
+    form: formData,
+    annotations: layersData,
+    stats: {
+      total: annotations.length,
+      by_layer: Object.fromEntries(Object.keys(LAYERS_CONFIG).map(k => [k, layersData[k].length]))
+    }
+  };
+
+  // Embed image
+  if (currentFile) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      payload.image_base64 = e.target.result;
+      download(payload, formData);
+    };
+    reader.readAsDataURL(currentFile);
+  } else {
+    download(payload, formData);
+  }
+}
+
+function download(payload, form) {
+  const name = [form.servicio_id || 'SRV', form.imagen_id || 'IMG', Date.now()].join('_') + '.json';
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  closeExport();
+}
+
+function resetAll() {
+  if (!confirm('¿Seguro que quieres cargar una nueva imagen? Se perderán las anotaciones actuales.')) return;
+  location.reload();
+}
+</script>
 </body>
 </html>
